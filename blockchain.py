@@ -1,0 +1,309 @@
+import hashlib
+from time import time
+import json
+from uuid import uuid4
+from urllib.parse import urlparse
+import requests
+
+from flask import Flask, jsonify, request
+
+
+class Blockchain(object):
+    def __init__(self):
+        self.chain = []
+        self.current_transactions = []
+
+        self.new_block(previous_hash=1, proof=100)
+
+        self.nodes = set()
+
+    def new_block(self, proof, previous_hash=None):
+        """
+        Set up a new block that stores added transactions before the block was mined
+        :param proof: proof from PoW algorithm
+        :param previous_hash: hash of previous block in chain
+        :return:
+        """
+
+        # block to add containing an index starting at one, unix timestamp, transactions, proof and the hash of the prev
+        # block
+        block = {
+            'index': len(self.chain) + 1,
+            'timestamp': time(),
+            'transactions': self.current_transactions,
+            'proof': proof,
+            'previous_hash': previous_hash or self.hash(self.chain[-1])
+        }
+
+        # empty the current transactions
+        self.current_transactions = []
+
+        # append new block to chain
+        self.chain.append(block)
+
+        return block
+
+
+    def new_transactions(self, sender, recipient, amount):
+        """
+        Appending new transactions to add to the new block
+        :param sender: sender string
+        :param recipient: recipient string
+        :param amount: amount int
+        :return:
+        """
+
+        self.current_transactions.append({
+            'sender': sender,
+            'recipient': recipient,
+            'amount': amount
+        })
+
+        # return the block to append to (a new index)
+        return self.last_block['index'] + 1
+
+    @staticmethod
+    def hash(block):
+        """
+        Create a sha-256 hash of a block
+        :param block:
+        :return:
+        """
+        block_string = json.dumps(block, sort_keys=True).encode()
+        return hashlib.sha3_256(block_string).hexdigest()
+
+    @property
+    def last_block(self):
+        return self.chain[-1]
+
+    def proof_of_work(self, last_proof, last_block):
+        """
+        Trial and error each number for proof until proven
+        :param last_proof: proof of last block
+        :return:
+        """
+
+        proof = 0
+        last_hash = self.hash(last_block)
+        while self.valid_proof(last_proof, proof, last_hash) is False:
+            proof += 1
+
+        return proof
+
+    @staticmethod
+    def valid_proof(last_proof, proof, last_hash):
+        """
+        Combine last proof and proof in a way that the sha-256 hash of the combination has four 0s at the start
+        :param last_proof: proof of last block
+        :param proof: proof to test
+        :return:
+        """
+
+        guess = f'{last_proof}{proof}{last_hash}'.encode()
+        guess_hash = hashlib.sha256(guess).hexdigest()
+
+        return guess_hash[:4] == "0000"
+
+    def valid_chain(self, chain):
+        """
+        Check a blockchain is valid
+        :param chain: chain to check
+        :return:
+        """
+
+        # last block is the oldest on the chain
+        last_block = chain[0]
+        current_index = 1
+
+        # start at block one and loop to the end of the chain
+        while current_index < len(chain):
+
+            # block to check
+            block = chain[current_index]
+            print(f'{last_block}')
+            print(f'{block}')
+            print('\n___________\n')
+            last_block_hash = self.hash(last_block)
+
+            # check the hash in the block and check by hashing the block they should be the same
+            if block['previous_hash'] != last_block_hash:
+                return False
+
+            # check the proof is valid on the block
+            if not self.valid_proof(last_block['proof'], block['proof'], last_block_hash):
+                return False
+
+            # update all the block items
+            last_block = block
+            current_index += 1
+
+        return True
+
+    def register_node(self, address):
+        """
+        Register a node on a different machine/port
+        :param address: address to register
+        :return:
+        """
+        parsed_url = urlparse(address)
+        self.nodes.add(parsed_url.netloc)
+
+    def resolve_conflicts(self):
+        """
+        Resolve conflicts between nodes and overwrite the outdated one if the new one has a valid chain
+        :return:
+        """
+
+        # get a list of nodes
+        neighbours = self.nodes
+        new_chain = None
+
+        # check chain length
+        max_length = len(self.chain)
+
+        # get the chain from the new node for each new node
+        for node in neighbours:
+            response = requests.get(f'http://{node}/chain')
+
+            # if valid response
+            if response.status_code == 200:
+                length = response.json()['length']
+                chain = response.json()['chain']
+
+                # if the new chain is longer and is valid
+                if length > max_length and self.valid_chain(chain):
+                    # set a new max length and chain to check against the other chains
+                    max_length = length
+                    new_chain = chain
+
+        # if there is a new chain update the chain
+        if new_chain:
+            self.chain = new_chain
+            return True
+
+        return False
+
+app = Flask(__name__)
+node_identifier = str(uuid4()).replace('-', '')
+blockchain = Blockchain()
+
+@app.route('/mine', methods=['GET'])
+def mine ():
+    """
+    Route the mining function
+    :return:
+    """
+
+    # set the block
+    last_block = blockchain.last_block
+    last_proof = last_block['proof']
+
+    # add a proof
+    proof = blockchain.proof_of_work(last_proof, last_block)
+
+    # add all new transactions to the new block
+    blockchain.new_transactions(
+        sender="0",
+        recipient=node_identifier,
+        amount=1
+    )
+
+    # set the hash of the block
+    previous_hash = blockchain.hash(last_block)
+
+    # set up a new block with the proof of work and the hash
+    block = blockchain.new_block(proof, previous_hash)
+
+    # build response
+    response = {
+        'message': 'New block forged',
+        'index': block['index'],
+        'transaction': block['transactions'],
+        'proof': block['proof'],
+        'previous_hash': block['previous_hash']
+    }
+
+    return jsonify(response), 200
+
+@app.route('/transactions/new', methods=['POST'])
+def new_transaction():
+    """
+    Add transactions
+    :return:
+    """
+
+    # read in json with transaction data
+    values = request.get_json()
+
+    # check request contains required data
+    required = ['sender', 'recipient', 'amount']
+    if not all(k in values for k in required):
+        return 'Missing values', 400
+
+    # add the transaction under a new index/the same new index
+    index = blockchain.new_transactions(values['sender'], values['recipient'], values['amount'])
+
+    response = {'message': f'Transaction will be added to block {index}'}
+    return jsonify(response), 201
+
+@app.route('/chain', methods=['GET'])
+def full_chain():
+    """
+    Display a chain
+    :return:
+    """
+
+    response = {
+        'chain': blockchain.chain,
+        'length': len(blockchain.chain)
+    }
+
+    return jsonify(response), 200
+
+@app.route('/nodes/register', methods=['POST'])
+def register_nodes():
+    """
+    Register a new node
+    :return:
+    """
+
+    # read in values for new node
+    values = request.get_json()
+
+    nodes = values.get('nodes')
+
+    if nodes is None:
+        return "Error: Please supply a valid list of nodes", 400
+
+    for node in nodes:
+        blockchain.register_node(node)
+
+    response = {
+        'message': 'New nodes have been added',
+        'total_nodes': list(blockchain.nodes)
+    }
+
+    return jsonify(response), 201
+
+@app.route('/nodes/resolve', methods=['GET'])
+def conflicts():
+    replaced = blockchain.resolve_conflicts()
+
+    if replaced:
+        response = {
+            'message': 'Our chain was replaced',
+            'new_chain': blockchain.chain
+        }
+
+    else:
+        response = {
+            'message': 'Our chain is authoritative',
+            'new_chain': blockchain.chain
+        }
+
+    return jsonify(response), 200
+
+
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
