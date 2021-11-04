@@ -38,7 +38,7 @@ def mine ():
     response = {
         'message': 'New block forged',
         'index': block['index'],
-        'transaction': block['transactions'],
+        'data': block['data'],
         'proof': block['proof'],
         'previous_hash': block['previous_hash']
     }
@@ -53,7 +53,7 @@ def new_transaction():
     """
 
     # read in json with transaction data
-    values = request.get_json()
+    values = request.get_json(force=True)
 
     # check request contains required data
     required = ['se_ep', 'script']
@@ -61,7 +61,7 @@ def new_transaction():
         return 'Missing values', 400
 
     # add the transaction under a new index/the same new index
-    index = blockchain.new_transactions(values['sender'], values['script'])
+    index = blockchain.new_transactions(values['se_ep'], values['script'])
 
     response = {'message': f'Transaction will be added to block {index}'}
     return jsonify(response), 201
@@ -88,9 +88,7 @@ def register_nodes():
     """
 
     # read in values for new node
-    values = request.get_json()
-
-    nodes = values.get('nodes')
+    nodes = (request.get_json(force=True)).get('nodes')
 
     if nodes is None:
         return "Error: Please supply a valid list of nodes", 400
@@ -107,6 +105,10 @@ def register_nodes():
 
 @app.route('/nodes/resolve', methods=['GET'])
 def conflicts():
+    """
+    Method to resolve conflicts and overwrite a chain without new data
+    :return:
+    """
     replaced = blockchain.resolve_conflicts()
 
     if replaced:
