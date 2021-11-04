@@ -27,7 +27,7 @@ class Blockchain(object):
         block = {
             'index': len(self.chain) + 1,
             'timestamp': time(),
-            'transactions': self.current_transactions,
+            'script': self.current_transactions,
             'proof': proof,
             'previous_hash': previous_hash or self.hash(self.chain[-1])
         }
@@ -40,20 +40,17 @@ class Blockchain(object):
 
         return block
 
-
-    def new_transactions(self, sender, recipient, amount):
+    def new_transactions(self, se_ep, script):
         """
         Appending new transactions to add to the new block
-        :param sender: sender string
-        :param recipient: recipient string
-        :param amount: amount int
+        :param se_ep: sender string
+        :param script: recipient string
         :return:
         """
 
         self.current_transactions.append({
-            'sender': sender,
-            'recipient': recipient,
-            'amount': amount
+            'se_ep': se_ep,
+            'script': script,
         })
 
         # return the block to append to (a new index)

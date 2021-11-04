@@ -24,9 +24,8 @@ def mine ():
 
     # add all new transactions to the new block
     blockchain.new_transactions(
-        sender="0",
-        recipient=node_identifier,
-        amount=1
+        se_ep="0",
+        script="Unaired"
     )
 
     # set the hash of the block
@@ -57,12 +56,12 @@ def new_transaction():
     values = request.get_json()
 
     # check request contains required data
-    required = ['sender', 'recipient', 'amount']
+    required = ['se_ep', 'script']
     if not all(k in values for k in required):
         return 'Missing values', 400
 
     # add the transaction under a new index/the same new index
-    index = blockchain.new_transactions(values['sender'], values['recipient'], values['amount'])
+    index = blockchain.new_transactions(values['sender'], values['script'])
 
     response = {'message': f'Transaction will be added to block {index}'}
     return jsonify(response), 201
