@@ -60,16 +60,28 @@ print(reg_response)
 resolve_response = requests.get("http://0.0.0.0:5001/nodes/resolve")
 print(resolve_response)
 
-print('\n ------ Test the proofs ------- \n')
+# validation
+print('\n ------ Test the proofs and hashes ------- \n')
 for i in range(1, len(json.loads(chain_response.text).get('chain'))):
+    print(f'Test block {i} proof: \n')
     previous_hash = json.loads(chain_response.text).get('chain')[i].get('previous_hash')
     proof = json.loads(chain_response.text).get('chain')[i].get('proof')
     last_proof = json.loads(chain_response.text).get('chain')[i-1].get('proof')
 
     string = f'{last_proof}{proof}{previous_hash}'.encode()
     hashed = hashlib.sha256(string).hexdigest()
-    print(hashed)
-# add new updates
+    print(f'Test pass: {hashed[0:4] == "0000"}. Val: {hashed}\n')
+    print('-----------------')
+
+    print(f'Test block {i} hash" \n')
+    block = json.dumps(json.loads(chain_response.text).get('chain')[i-1]).encode()
+    prev_block_hash = hashlib.sha3_256(block).hexdigest()
+    prev_hash = json.loads(chain_response.text).get('chain')[i].get('previous_hash')
+    print(f'Test pass: {previous_hash == prev_block_hash}. Val: {previous_hash}. Comp to: {prev_block_hash}\n')
+    print('-----------------')
+
+    # check the hashes
+
 
 # resolve conflicts
 
