@@ -64,7 +64,9 @@ class Blockchain(object):
         :return:
         """
         block_string = json.dumps(block, sort_keys=True).encode()
+
         return hashlib.sha3_256(block_string).hexdigest()
+
 
     @property
     def last_block(self):

@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import requests
+import hashlib
 
 def open_json(path):
     if path:
@@ -41,23 +42,33 @@ for i in initial:
     print(mine_response)
 
     chain_response = requests.get("http://0.0.0.0:5000/chain")
-    print(chain_response.content)
 
 # register second node
-data = {'nodes': ["http://0.0.0.0:5001"]}
-second_reg_response = requests.get("http://0.0.0.0:5000/register")
-print(second_reg_response)
+d = {"nodes": ["http://0.0.0.0:5001"]}
+reg_response = requests.post("http://0.0.0.0:5000/nodes/register", data=json.dumps(d))
+print(reg_response)
 
-data = {'nodes': ["http://0.0.0.0:5000"]}
-second_reg_response = requests.get("http://0.0.0.0:5001/register")
-print(second_reg_response)
+d = {"nodes": ["http://0.0.0.0:5000"]}
+reg_response = requests.post("http://0.0.0.0:5001/nodes/register", data=json.dumps(d))
+print(reg_response)
 
-data = {'nodes': ["http://0.0.0.0:5001"]}
-second_reg_response = requests.get("http://0.0.0.0:5001/register")
-print(second_reg_response)
+d = {"nodes": ["http://0.0.0.0:5001"]}
+reg_response = requests.post("http://0.0.0.0:5001/nodes/register", data=json.dumps(d))
+print(reg_response)
 
 # resolve conflicts
+resolve_response = requests.get("http://0.0.0.0:5001/nodes/resolve")
+print(resolve_response)
 
+print('\n ------ Test the proofs ------- \n')
+for i in range(1, len(json.loads(chain_response.text).get('chain'))):
+    previous_hash = json.loads(chain_response.text).get('chain')[i].get('previous_hash')
+    proof = json.loads(chain_response.text).get('chain')[i].get('proof')
+    last_proof = json.loads(chain_response.text).get('chain')[i-1].get('proof')
+
+    string = f'{last_proof}{proof}{previous_hash}'.encode()
+    hashed = hashlib.sha256(string).hexdigest()
+    print(hashed)
 # add new updates
 
 # resolve conflicts
@@ -65,7 +76,3 @@ print(second_reg_response)
 # add updated to second node
 
 # resolve conflicts
-
-
-
-"""

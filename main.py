@@ -22,12 +22,6 @@ def mine ():
     # add a proof
     proof = blockchain.proof_of_work(last_proof, last_block)
 
-    # add all new transactions to the new block
-    blockchain.new_transactions(
-        se_ep="0",
-        script="Unaired"
-    )
-
     # set the hash of the block
     previous_hash = blockchain.hash(last_block)
 
@@ -128,4 +122,4 @@ def conflicts():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5001)
