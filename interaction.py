@@ -4,6 +4,8 @@ import os
 import requests
 import hashlib
 
+
+# function to open JSON file
 def open_json(path):
     if path:
         try:
@@ -18,13 +20,16 @@ def open_json(path):
     else:
         logging.warning('-- WARNING: User' + path + 'was not found.\n')
 
+
+# list all data files
 data = os.listdir('data')
 
+# set up datasets
 initial = data[:4]
 update = data[5:7]
 update_second = data[8:]
 
-# register node
+# register first node
 d = {"nodes": ["http://0.0.0.0:5000"]}
 reg_response = requests.post("http://0.0.0.0:5000/nodes/register", data=json.dumps(d))
 print(reg_response)
@@ -43,7 +48,7 @@ for i in initial:
 
     chain_response = requests.get("http://0.0.0.0:5000/chain")
 
-# register second node
+# register each node with each other
 d = {"nodes": ["http://0.0.0.0:5001"]}
 reg_response = requests.post("http://0.0.0.0:5000/nodes/register", data=json.dumps(d))
 print(reg_response)
@@ -63,6 +68,7 @@ print(resolve_response)
 # validation
 print('\n ------ Test the proofs and hashes ------- \n')
 for i in range(1, len(json.loads(chain_response.text).get('chain'))):
+    # check proofs
     print(f'Test block {i} proof: \n')
     previous_hash = json.loads(chain_response.text).get('chain')[i].get('previous_hash')
     proof = json.loads(chain_response.text).get('chain')[i].get('proof')
@@ -73,18 +79,10 @@ for i in range(1, len(json.loads(chain_response.text).get('chain'))):
     print(f'Test pass: {hashed[0:4] == "0000"}. Val: {hashed}\n')
     print('-----------------')
 
+    # check hashes
     print(f'Test block {i} hash" \n')
     block = json.dumps(json.loads(chain_response.text).get('chain')[i-1]).encode()
     prev_block_hash = hashlib.sha3_256(block).hexdigest()
     prev_hash = json.loads(chain_response.text).get('chain')[i].get('previous_hash')
     print(f'Test pass: {previous_hash == prev_block_hash}. Val: {previous_hash}. Comp to: {prev_block_hash}\n')
     print('-----------------')
-
-    # check the hashes
-
-
-# resolve conflicts
-
-# add updated to second node
-
-# resolve conflicts
